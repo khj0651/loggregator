@@ -17,7 +17,7 @@ type TruncatingBuffer struct {
 	logger              *gosteno.Logger
 	lock                *sync.RWMutex
 	dropsondeOrigin     string
-	droppedMessageCount int64
+	droppedMessageCount uint64
 }
 
 func NewTruncatingBuffer(inputChannel <-chan *events.Envelope, bufferSize uint, logger *gosteno.Logger, dropsondeOrigin string) *TruncatingBuffer {
@@ -50,7 +50,7 @@ func (r *TruncatingBuffer) Run() {
 		case r.outputChannel <- msg:
 		default:
 			messageCount := len(r.outputChannel)
-			r.droppedMessageCount += int64(messageCount)
+			r.droppedMessageCount += uint64(messageCount)
 			r.outputChannel = make(chan *events.Envelope, cap(r.outputChannel))
 			appId := envelope_extensions.GetAppId(msg)
 			lm := generateLogMessage(fmt.Sprintf("Log message output too high. We've dropped %d messages", messageCount), appId)
@@ -73,7 +73,7 @@ func (r *TruncatingBuffer) Run() {
 	close(r.outputChannel)
 }
 
-func (r *TruncatingBuffer) GetDroppedMessageCount() int64 {
+func (r *TruncatingBuffer) GetDroppedMessageCount() uint64 {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	messages := r.droppedMessageCount

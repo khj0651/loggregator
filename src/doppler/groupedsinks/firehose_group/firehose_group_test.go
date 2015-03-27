@@ -36,7 +36,7 @@ func (f *fakeSink) GetInstrumentationMetric() instrumentation.Metric {
 	return instrumentation.Metric{}
 }
 
-func (f *fakeSink) UpdateDroppedMessageCount(messageCount int64) {}
+func (f *fakeSink) UpdateDroppedMessageCount(messageCount uint64) {}
 
 var _ = Describe("FirehoseGroup", func() {
 	It("sends message to all registered sinks", func() {

@@ -10,7 +10,6 @@ import (
 
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	"sync/atomic"
 )
 
@@ -22,29 +21,31 @@ const (
 
 type SyslogSink struct {
 	*gosteno.Logger
-	appId               string
-	drainUrl            string
-	sentMessageCount    *uint64
-	droppedMessageCount int64
-	sentByteCount       *uint64
-	listenerChannel     chan *events.Envelope
-	syslogWriter        syslogwriter.Writer
-	handleSendError     func(errorMessage, appId, drainUrl string)
-	disconnectChannel   chan struct{}
-	dropsondeOrigin     string
-	disconnectOnce      sync.Once
+	appId                     string
+	drainUrl                  string
+	sentMessageCount          *uint64
+	droppedMessageCount       uint64
+	sentByteCount             *uint64
+	listenerChannel           chan *events.Envelope
+	syslogWriter              syslogwriter.Writer
+	handleSendError           func(errorMessage, appId, drainUrl string)
+	disconnectChannel         chan struct{}
+	dropsondeOrigin           string
+	disconnectOnce            sync.Once
+	appDrainMetricsWriterChan chan sinks.DrainMetric
 }
 
-func NewSyslogSink(appId string, drainUrl string, givenLogger *gosteno.Logger, syslogWriter syslogwriter.Writer, errorHandler func(string, string, string), dropsondeOrigin string) sinks.Sink {
+func NewSyslogSink(appId string, drainUrl string, givenLogger *gosteno.Logger, syslogWriter syslogwriter.Writer, errorHandler func(string, string, string), dropsondeOrigin string, appDrainMetricsWriterChan chan sinks.DrainMetric) sinks.Sink {
 	givenLogger.Debugf("Syslog Sink %s: Created for appId [%s]", drainUrl, appId)
 	return &SyslogSink{
-		appId:             appId,
-		drainUrl:          drainUrl,
-		Logger:            givenLogger,
-		syslogWriter:      syslogWriter,
-		handleSendError:   errorHandler,
-		disconnectChannel: make(chan struct{}),
-		dropsondeOrigin:   dropsondeOrigin,
+		appId:                     appId,
+		drainUrl:                  drainUrl,
+		Logger:                    givenLogger,
+		syslogWriter:              syslogWriter,
+		handleSendError:           errorHandler,
+		disconnectChannel:         make(chan struct{}),
+		dropsondeOrigin:           dropsondeOrigin,
+		appDrainMetricsWriterChan: appDrainMetricsWriterChan,
 	}
 }
 
@@ -112,7 +113,7 @@ func (s *SyslogSink) Run(inputChan <-chan *events.Envelope) {
 		case <-s.disconnectChannel:
 			return
 		case messageEnvelope, ok := <-buffer.GetOutputChannel():
-			atomic.AddInt64(&s.droppedMessageCount, buffer.GetDroppedMessageCount())
+			s.UpdateDroppedMessageCount(buffer.GetDroppedMessageCount())
 			if !ok {
 				s.Debugf("Syslog Sink %s: Closed listener channel detected. Closing.\n", s.drainUrl)
 				return
@@ -170,14 +171,17 @@ func messagePriorityValue(msg *events.LogMessage) int {
 	}
 }
 
-func (s *SyslogSink) GetInstrumentationMetric() instrumentation.Metric {
-	count := atomic.LoadInt64(&s.droppedMessageCount)
-	if count != 0 {
-		return instrumentation.Metric{Name: "numberOfMessagesLost", Tags: map[string]interface{}{"appId": string(s.appId), "drainUrl": s.drainUrl}, Value: count}
+func (s *SyslogSink) UpdateDroppedMessageCount(messageCount uint64) {
+	if messageCount == 0 {
+		return
 	}
-	return instrumentation.Metric{}
-}
 
-func (s *SyslogSink) UpdateDroppedMessageCount(messageCount int64) {
-	atomic.AddInt64(&s.droppedMessageCount, messageCount)
+	atomic.AddUint64(&s.droppedMessageCount, messageCount)
+
+	metric := sinks.DrainMetric{AppId: s.appId, DrainURL: s.drainUrl, DroppedMsgCount: atomic.LoadUint64(&s.droppedMessageCount)}
+
+	select {
+	case s.appDrainMetricsWriterChan <- metric:
+	default:
+	}
 }

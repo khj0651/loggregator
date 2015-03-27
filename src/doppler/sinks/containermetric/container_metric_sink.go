@@ -1,8 +1,8 @@
 package containermetric
 
 import (
+	"doppler/sinks"
 	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,16 +13,18 @@ type ContainerMetricSink struct {
 	ttl                 time.Duration
 	metrics             map[int32]*events.Envelope
 	inactivityDuration  time.Duration
-	droppedMessageCount int64
+	droppedMessageCount uint64
 	sync.RWMutex
+	appDrainMetricsWriterChan chan sinks.DrainMetric
 }
 
-func NewContainerMetricSink(applicationId string, ttl time.Duration, inactivityDuration time.Duration) *ContainerMetricSink {
+func NewContainerMetricSink(applicationId string, ttl time.Duration, inactivityDuration time.Duration, appDrainMetricsWriterChan chan sinks.DrainMetric) *ContainerMetricSink {
 	return &ContainerMetricSink{
-		applicationId:      applicationId,
-		ttl:                ttl,
-		inactivityDuration: inactivityDuration,
-		metrics:            make(map[int32]*events.Envelope),
+		applicationId:             applicationId,
+		ttl:                       ttl,
+		inactivityDuration:        inactivityDuration,
+		metrics:                   make(map[int32]*events.Envelope),
+		appDrainMetricsWriterChan: appDrainMetricsWriterChan,
 	}
 }
 
@@ -96,14 +98,17 @@ func (sink *ContainerMetricSink) updateMetric(event *events.Envelope) {
 	}
 }
 
-func (sink *ContainerMetricSink) GetInstrumentationMetric() instrumentation.Metric {
-	count := atomic.LoadInt64(&sink.droppedMessageCount)
-	if count != 0 {
-		return instrumentation.Metric{Name: "numberOfMessagesLost", Tags: map[string]interface{}{"appId": string(sink.applicationId), "drainUrl": "containerMetricSink"}, Value: count}
+func (s *ContainerMetricSink) UpdateDroppedMessageCount(messageCount uint64) {
+	if messageCount == 0 {
+		return
 	}
-	return instrumentation.Metric{}
-}
 
-func (sink *ContainerMetricSink) UpdateDroppedMessageCount(messageCount int64) {
-	atomic.AddInt64(&sink.droppedMessageCount, messageCount)
+	atomic.AddUint64(&s.droppedMessageCount, messageCount)
+
+	metric := sinks.DrainMetric{AppId: s.applicationId, DrainURL: "containerMetricSink", DroppedMsgCount: atomic.LoadUint64(&s.droppedMessageCount)}
+
+	select {
+	case s.appDrainMetricsWriterChan <- metric:
+	default:
+	}
 }

@@ -10,7 +10,6 @@ import (
 	"doppler/sinks/websocket"
 	"github.com/cloudfoundry/dropsonde/events"
 	"github.com/cloudfoundry/gosteno"
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation"
 	"sync"
 )
 
@@ -243,19 +242,4 @@ func (group *GroupedSinks) DeleteAll() {
 		fgroup.RemoveAllSinks()
 		delete(group.firehoses, subscriptionId)
 	}
-}
-
-func (group *GroupedSinks) GetAllInstrumentationMetrics() []instrumentation.Metric {
-	group.RLock()
-	defer group.RUnlock()
-	var metrics []instrumentation.Metric
-	for _, appId := range group.apps {
-		for _, wrapper := range appId {
-			metric := wrapper.Sink.GetInstrumentationMetric()
-			if metric.Value != nil {
-				metrics = append(metrics, metric)
-			}
-		}
-	}
-	return metrics
 }

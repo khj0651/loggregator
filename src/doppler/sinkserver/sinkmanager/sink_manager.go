@@ -57,6 +57,7 @@ func NewSinkManager(maxRetainedLogMessages uint32, skipCertVerify bool, blackLis
 func (sinkManager *SinkManager) Start(newAppServiceChan, deletedAppServiceChan <-chan appservice.AppService) {
 	go sinkManager.listenForNewAppServices(newAppServiceChan)
 	go sinkManager.listenForDeletedAppServices(deletedAppServiceChan)
+	go sinkManager.Metrics.ListenForUpdatedAppDrainMetrics()
 
 	sinkManager.listenForErrorMessages()
 }
@@ -81,6 +82,7 @@ func (sinkManager *SinkManager) RegisterSink(sink sinks.Sink) bool {
 		return false
 	}
 
+	sinkManager.Metrics.AddAppDrainEntry(sink.StreamId(), sink.Identifier())
 	sinkManager.Metrics.Inc(sink)
 
 	sinkManager.logger.Debugf("SinkManager: Sink with identifier %v requested. Opened it.", sink.Identifier())
@@ -94,11 +96,12 @@ func (sinkManager *SinkManager) RegisterSink(sink sinks.Sink) bool {
 }
 
 func (sinkManager *SinkManager) UnregisterSink(sink sinks.Sink) {
-
 	ok := sinkManager.sinks.CloseAndDelete(sink)
 	if !ok {
 		return
 	}
+
+	sinkManager.Metrics.RemoveAppDrainEntry(sink.StreamId(), sink.Identifier())
 	sinkManager.Metrics.Dec(sink)
 
 	if syslogSink, ok := sink.(*syslog.SyslogSink); ok {
@@ -115,6 +118,7 @@ func (sinkManager *SinkManager) RegisterFirehoseSink(sink sinks.Sink) bool {
 		return false
 	}
 
+	sinkManager.Metrics.AddAppDrainEntry(sink.StreamId(), sink.Identifier())
 	sinkManager.Metrics.IncFirehose()
 
 	sinkManager.logger.Debugf("SinkManager: Firehose sink with identifier %v requested. Opened it.", sink.Identifier())
@@ -132,7 +136,9 @@ func (sinkManager *SinkManager) UnregisterFirehoseSink(sink sinks.Sink) {
 		return
 	}
 
+	sinkManager.Metrics.RemoveAppDrainEntry(sink.StreamId(), sink.Identifier())
 	sinkManager.Metrics.DecFirehose()
+
 	sinkManager.logger.Debugf("SinkManager: Firehose Sink with identifier %s requested closing. Closed it.", sink.Identifier())
 }
 
@@ -172,7 +178,6 @@ func (sinkManager *SinkManager) SendSyslogErrorToLoggregator(errorMsg string, ap
 }
 
 func (sinkManager *SinkManager) Emit() instrumentation.Context {
-	sinkManager.Metrics.AddAppDrainMetrics(sinkManager.sinks.GetAllInstrumentationMetrics())
 	return sinkManager.Metrics.Emit()
 }
 
@@ -220,7 +225,7 @@ func (sinkManager *SinkManager) registerNewSyslogSink(appId string, syslogSinkUr
 		sinkManager.SendSyslogErrorToLoggregator(invalidSyslogUrlErrorMsg(appId, syslogSinkUrl, err), appId, syslogSinkUrl)
 		return
 	}
-	syslogSink := syslog.NewSyslogSink(appId, syslogSinkUrl, sinkManager.logger, syslogWriter, sinkManager.SendSyslogErrorToLoggregator, sinkManager.DropsondeOrigin)
+	syslogSink := syslog.NewSyslogSink(appId, syslogSinkUrl, sinkManager.logger, syslogWriter, sinkManager.SendSyslogErrorToLoggregator, sinkManager.DropsondeOrigin, sinkManager.Metrics.AppDrainMetricsReceiverChan)
 	sinkManager.RegisterSink(syslogSink)
 
 }
@@ -234,7 +239,7 @@ func (sinkManager *SinkManager) ensureRecentLogsSinkFor(appId string) {
 		return
 	}
 
-	sink := dump.NewDumpSink(appId, sinkManager.recentLogCount, sinkManager.logger, sinkManager.sinkTimeout)
+	sink := dump.NewDumpSink(appId, sinkManager.recentLogCount, sinkManager.logger, sinkManager.sinkTimeout, sinkManager.Metrics.AppDrainMetricsReceiverChan)
 	sinkManager.RegisterSink(sink)
 }
 
@@ -243,6 +248,6 @@ func (sinkManager *SinkManager) ensureContainerMetricsSinkFor(appId string) {
 		return
 	}
 
-	sink := containermetric.NewContainerMetricSink(appId, sinkManager.metricTTL, sinkManager.sinkTimeout)
+	sink := containermetric.NewContainerMetricSink(appId, sinkManager.metricTTL, sinkManager.sinkTimeout, sinkManager.Metrics.AppDrainMetricsReceiverChan)
 	sinkManager.RegisterSink(sink)
 }
