@@ -11,14 +11,13 @@ import (
 )
 
 type SinkManagerMetrics struct {
-	DumpSinks                    uint64
-	WebsocketSinks               uint64
-	SyslogSinks                  uint64
-	FirehoseSinks                uint64
-	SyslogDrainErrorCounts       SyslogDrainErrorCounts
-	AppDrainMetrics              map[AppDrainMetricKey]uint64
-	AppDrainMetricsReceiverChan  chan sinks.DrainMetric
-	TotalAppDrainMessagesDropped uint64
+	DumpSinks                   uint64
+	WebsocketSinks              uint64
+	SyslogSinks                 uint64
+	FirehoseSinks               uint64
+	SyslogDrainErrorCounts      SyslogDrainErrorCounts
+	AppDrainMetrics             map[AppDrainMetricKey]uint64
+	AppDrainMetricsReceiverChan chan sinks.DrainMetric
 
 	sync.RWMutex
 }
@@ -46,11 +45,8 @@ func (sinkManagerMetrics *SinkManagerMetrics) ListenForUpdatedAppDrainMetrics() 
 	for drainMetric := range sinkManagerMetrics.AppDrainMetricsReceiverChan {
 		key := AppDrainMetricKey{AppId: drainMetric.AppId, DrainURL: drainMetric.DrainURL}
 		sinkManagerMetrics.Lock()
-		previousDroppedMsgCount := sinkManagerMetrics.AppDrainMetrics[key]
 		sinkManagerMetrics.AppDrainMetrics[key] = drainMetric.DroppedMsgCount
 		sinkManagerMetrics.Unlock()
-		delta := drainMetric.DroppedMsgCount - previousDroppedMsgCount
-		atomic.AddUint64(&sinkManagerMetrics.TotalAppDrainMessagesDropped, delta)
 	}
 }
 
@@ -116,11 +112,15 @@ func (sinkManagerMetrics *SinkManagerMetrics) ReportSyslogError(appId string, dr
 
 func (sinkManagerMetrics *SinkManagerMetrics) CreateAppDrainMetrics() []instrumentation.Metric {
 	var instrumentationMetrics []instrumentation.Metric
+	var totalMessageDropped uint64
 	for key, value := range sinkManagerMetrics.AppDrainMetrics {
 		tags := map[string]interface{}{"appId": key.AppId, "drainUrl": key.DrainURL}
 		metric := instrumentation.Metric{Name: "numberOfMessagesLost", Tags: tags, Value: value}
 		instrumentationMetrics = append(instrumentationMetrics, metric)
+		totalMessageDropped += value
 	}
+	totalMetric := instrumentation.Metric{Name: "totalDroppedMessages", Value: totalMessageDropped}
+	instrumentationMetrics = append(instrumentationMetrics, totalMetric)
 	return instrumentationMetrics
 }
 
@@ -142,7 +142,6 @@ func (sinkManagerMetrics *SinkManagerMetrics) Emit() instrumentation.Context {
 	sinkManagerMetrics.SyslogDrainErrorCounts.Unlock()
 
 	sinkManagerMetrics.RLock()
-	data = append(data, instrumentation.Metric{Name: "totalDroppedMessages", Value: atomic.LoadUint64(&sinkManagerMetrics.TotalAppDrainMessagesDropped)})
 	data = append(data, sinkManagerMetrics.CreateAppDrainMetrics()...)
 	sinkManagerMetrics.RUnlock()
 

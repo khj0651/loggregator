@@ -467,9 +467,9 @@ var _ = Describe("SinkManager", func() {
 			Eventually(func() uint64 {
 				metrics = sinkManager.Emit().Metrics
 				return metrics[len(metrics)-1].Value.(uint64)
-			}).Should(Equal(uint64(25)))
+			}).Should(Equal(uint64(75)))
 
-			appMetric := metrics[len(metrics)-2:]
+			appMetric := metrics[len(metrics)-3 : len(metrics)-1]
 			Expect(appMetric).To(ConsistOf(
 				instrumentation.Metric{Name: "numberOfMessagesLost", Value: uint64(50), Tags: map[string]interface{}{"appId": "myApp1", "drainUrl": "myAppChan1"}},
 				instrumentation.Metric{Name: "numberOfMessagesLost", Value: uint64(25), Tags: map[string]interface{}{"appId": "myApp2", "drainUrl": "myAppChan2"}},
