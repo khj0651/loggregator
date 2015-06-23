@@ -25,6 +25,10 @@ import (
 	"github.com/cloudfoundry/storeadapter/etcdstoreadapter"
 	"github.com/cloudfoundry/yagnats"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
+	"metron/eventwriter"
+	"github.com/cloudfoundry/dropsonde/metrics"
+	"github.com/cloudfoundry/dropsonde/metric_sender"
+	"github.com/cloudfoundry/dropsonde/metricbatcher"
 )
 
 var (
@@ -45,6 +49,11 @@ func main() {
 	messageTagger := tagger.New(config.Deployment, config.Job, config.Index, marshaller)
 	aggregator := messageaggregator.New(messageTagger, logger)
 
+	eventWriter := eventwriter.New("MetronAgent", aggregator)
+	metricSender := metric_sender.NewMetricSender(eventWriter)
+	metricBatcher := metricbatcher.New(metricSender, time.Duration(config.MetricBatchIntervalSeconds) * time.Second)
+	metrics.Initialize(metricSender, metricBatcher)
+
 	dropsondeUnmarshaller := eventunmarshaller.New(aggregator, logger)
 	dropsondeReader := networkreader.New(fmt.Sprintf("localhost:%d", config.DropsondeIncomingMessagesPort), "dropsondeAgentListener", dropsondeUnmarshaller, logger)
 
@@ -53,8 +62,6 @@ func main() {
 	legacyReader := networkreader.New(fmt.Sprintf("localhost:%d", config.LegacyIncomingMessagesPort), "legacyAgentListener", legacyUnmarshaller, logger)
 
 	instrumentables := []instrumentation.Instrumentable{
-		legacyReader,
-		dropsondeReader,
 		legacyUnmarshaller,
 		dropsondeUnmarshaller,
 		aggregator,
@@ -125,6 +132,10 @@ func parseConfig(debug bool, configFile string, logFilePath string) (metronConfi
 		panic(err)
 	}
 
+	if config.MetricBatchIntervalSeconds == 0 {
+		config.MetricBatchIntervalSeconds = 15
+	}
+
 	logger := cfcomponent.NewLogger(debug, logFilePath, "metron", config.Config)
 	logger.Info("Startup: Setting up the Metron agent")
 
@@ -133,17 +144,23 @@ func parseConfig(debug bool, configFile string, logFilePath string) (metronConfi
 
 type metronConfig struct {
 	cfcomponent.Config
+
+	Deployment                    string
 	Zone                          string
-	Index                         uint
 	Job                           string
+	Index                         uint
+
 	LegacyIncomingMessagesPort    int
 	DropsondeIncomingMessagesPort int
+
 	EtcdUrls                      []string
 	EtcdMaxConcurrentRequests     int
 	EtcdQueryIntervalMilliseconds int
+
 	LoggregatorDropsondePort      int
 	SharedSecret                  string
-	Deployment                    string
+
+	MetricBatchIntervalSeconds uint
 }
 
 type metronHealthMonitor struct{}
