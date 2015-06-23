@@ -20,6 +20,7 @@ var metronSession *gexec.Session
 var etcdRunner *etcdstorerunner.ETCDClusterRunner
 var etcdPort int
 var localIPAddress string
+var pathToMetronExecutable string
 
 func TestNewIntegration(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -27,29 +28,35 @@ func TestNewIntegration(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	pathToMetronExecutable, err := gexec.Build("metron")
-	Expect(err).ShouldNot(HaveOccurred())
-
-	command := exec.Command(pathToMetronExecutable, "--config=fixtures/metron.json", "--debug")
-
-	metronSession, err = gexec.Start(command, gexec.NewPrefixedWriter("[o][metron]", GinkgoWriter), gexec.NewPrefixedWriter("[e][metron]", GinkgoWriter))
+	var err error
+	pathToMetronExecutable, err = gexec.Build("metron")
 	Expect(err).ShouldNot(HaveOccurred())
 
 	localIPAddress, _ = localip.LocalIP()
-
-	// wait for server to be up
-	Eventually(func() error {
-		_, err := http.Get("http://" + localIPAddress + ":1234")
-		return err
-	}, 3).ShouldNot(HaveOccurred())
 
 	etcdPort = 5800 + (config.GinkgoConfig.ParallelNode-1)*10
 	etcdRunner = etcdstorerunner.NewETCDClusterRunner(etcdPort, 1)
 	etcdRunner.Start()
 })
 
-var _ = AfterSuite(func() {
+var _ = BeforeEach(func() {
+	var err error
+	command := exec.Command(pathToMetronExecutable, "--config=fixtures/metron.json", "--debug")
+	metronSession, err = gexec.Start(command, gexec.NewPrefixedWriter("[o][metron]", GinkgoWriter), gexec.NewPrefixedWriter("[e][metron]", GinkgoWriter))
+	Expect(err).ShouldNot(HaveOccurred())
+
+	// wait for server to be up
+	Eventually(func() error {
+		_, err := http.Get("http://" + localIPAddress + ":1234")
+		return err
+	}, 3).ShouldNot(HaveOccurred())
+})
+
+var _ = AfterEach(func() {
 	metronSession.Kill().Wait()
+})
+
+var _ = AfterSuite(func() {
 	gexec.CleanupBuildArtifacts()
 
 	etcdRunner.Adapter().Disconnect()
