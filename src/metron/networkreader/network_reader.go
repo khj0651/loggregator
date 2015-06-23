@@ -51,10 +51,8 @@ func (nr *NetworkReader) Start() {
 		readData := make([]byte, readCount) //pass on buffer in size only of read data
 		copy(readData, readBuffer[:readCount])
 
-		nr.lock.Lock()
-		metrics.BatchIncrementCounter("receivedMessageCount")
-		metrics.BatchAddCounter("receivedByteCount", uint64(readCount))
-		nr.lock.Unlock()
+		metrics.BatchIncrementCounter(nr.contextName + ".receivedMessageCount")
+		metrics.BatchAddCounter(nr.contextName + ".receivedByteCount", uint64(readCount))
 		nr.writer.Write(readData)
 	}
 }

@@ -56,7 +56,7 @@ var _ = Describe("Self Instrumentation", func() {
 			Origin:    proto.String("MetronAgent"),
 			EventType: events.Envelope_CounterEvent.Enum(),
 			CounterEvent: &events.CounterEvent{
-				Name:  proto.String("receivedMessageCount"),
+				Name:  proto.String("dropsondeAgentListener.receivedMessageCount"),
 				Delta: proto.Uint64(1),
 				Total: proto.Uint64(1),
 			},
