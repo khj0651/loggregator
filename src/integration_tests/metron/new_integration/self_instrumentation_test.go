@@ -18,7 +18,7 @@ import (
 	. "integration_tests/metron/matchers"
 )
 
-var _ = FDescribe("Self Instrumentation", func() {
+var _ = Describe("Self Instrumentation", func() {
 	var (
 		fakeDoppler agentlistener.AgentListener
 		envelopes   chan *events.Envelope
@@ -63,6 +63,24 @@ var _ = FDescribe("Self Instrumentation", func() {
 		}
 
 		Eventually(envelopes).Should(Receive(MatchSpecifiedContents(&expected)))
+	})
+
+	It("counts legacy unmarshal errors", func() {
+		metronInput, _ := net.Dial("udp", "localhost:51160")
+		metronInput.Write([]byte{1,2,3})
+
+		expected := events.Envelope{
+			Origin:    proto.String("MetronAgent"),
+			EventType: events.Envelope_CounterEvent.Enum(),
+			CounterEvent: &events.CounterEvent{
+				Name:  proto.String("legacyUnmarshaller.unmarshalErrors"),
+				Delta: proto.Uint64(1),
+				Total: proto.Uint64(1),
+			},
+		}
+
+		Eventually(envelopes).Should(Receive(MatchSpecifiedContents(&expected)))
+
 	})
 })
 

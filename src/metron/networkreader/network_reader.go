@@ -6,8 +6,8 @@ import (
 
 	"metron/writers"
 
-	"github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/dropsonde/metrics"
+	"github.com/cloudfoundry/gosteno"
 )
 
 type NetworkReader struct {
@@ -15,7 +15,7 @@ type NetworkReader struct {
 	connection net.PacketConn
 	writer     writers.ByteArrayWriter
 
-	contextName          string
+	contextName string
 
 	lock   sync.RWMutex
 	logger *gosteno.Logger

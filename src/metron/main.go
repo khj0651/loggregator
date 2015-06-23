@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"metron/eventwriter"
 	"metron/networkreader"
 	"metron/writers/dopplerforwarder"
 	"metron/writers/eventmarshaller"
@@ -14,6 +15,9 @@ import (
 	"metron/writers/signer"
 	"metron/writers/tagger"
 
+	"github.com/cloudfoundry/dropsonde/metric_sender"
+	"github.com/cloudfoundry/dropsonde/metricbatcher"
+	"github.com/cloudfoundry/dropsonde/metrics"
 	"github.com/cloudfoundry/gosteno"
 	"github.com/cloudfoundry/gunk/workpool"
 	"github.com/cloudfoundry/loggregatorlib/cfcomponent"
@@ -25,10 +29,6 @@ import (
 	"github.com/cloudfoundry/storeadapter/etcdstoreadapter"
 	"github.com/cloudfoundry/yagnats"
 	"github.com/cloudfoundry/yagnats/fakeyagnats"
-	"metron/eventwriter"
-	"github.com/cloudfoundry/dropsonde/metrics"
-	"github.com/cloudfoundry/dropsonde/metric_sender"
-	"github.com/cloudfoundry/dropsonde/metricbatcher"
 )
 
 var (
@@ -51,7 +51,7 @@ func main() {
 
 	eventWriter := eventwriter.New("MetronAgent", aggregator)
 	metricSender := metric_sender.NewMetricSender(eventWriter)
-	metricBatcher := metricbatcher.New(metricSender, time.Duration(config.MetricBatchIntervalSeconds) * time.Second)
+	metricBatcher := metricbatcher.New(metricSender, time.Duration(config.MetricBatchIntervalSeconds)*time.Second)
 	metrics.Initialize(metricSender, metricBatcher)
 
 	dropsondeUnmarshaller := eventunmarshaller.New(aggregator, logger)
@@ -62,7 +62,6 @@ func main() {
 	legacyReader := networkreader.New(fmt.Sprintf("localhost:%d", config.LegacyIncomingMessagesPort), "legacyAgentListener", legacyUnmarshaller, logger)
 
 	instrumentables := []instrumentation.Instrumentable{
-		legacyUnmarshaller,
 		dropsondeUnmarshaller,
 		aggregator,
 		marshaller,
@@ -145,10 +144,10 @@ func parseConfig(debug bool, configFile string, logFilePath string) (metronConfi
 type metronConfig struct {
 	cfcomponent.Config
 
-	Deployment                    string
-	Zone                          string
-	Job                           string
-	Index                         uint
+	Deployment string
+	Zone       string
+	Job        string
+	Index      uint
 
 	LegacyIncomingMessagesPort    int
 	DropsondeIncomingMessagesPort int
@@ -157,8 +156,8 @@ type metronConfig struct {
 	EtcdMaxConcurrentRequests     int
 	EtcdQueryIntervalMilliseconds int
 
-	LoggregatorDropsondePort      int
-	SharedSecret                  string
+	LoggregatorDropsondePort int
+	SharedSecret             string
 
 	MetricBatchIntervalSeconds uint
 }

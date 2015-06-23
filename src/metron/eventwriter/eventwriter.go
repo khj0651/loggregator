@@ -1,11 +1,13 @@
 package eventwriter
+
 import (
 	"metron/writers"
-	"github.com/cloudfoundry/sonde-go/events"
+
 	"github.com/cloudfoundry/dropsonde/emitter"
+	"github.com/cloudfoundry/sonde-go/events"
 )
 
-type EventWriter struct{
+type EventWriter struct {
 	origin string
 	writer writers.EnvelopeWriter
 }

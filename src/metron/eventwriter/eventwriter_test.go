@@ -3,25 +3,26 @@ package eventwriter_test
 import (
 	"metron/eventwriter"
 	"metron/writers/mocks"
+
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
 
+	"github.com/cloudfoundry/dropsonde/emitter"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/cloudfoundry/dropsonde/emitter"
 )
 
 var _ = Describe("EventWriter", func() {
 	It("writes emitted events", func() {
 		writer := mocks.MockEnvelopeWriter{}
 		ew := eventwriter.New("Africa", &writer)
-		
+
 		event := &events.ValueMetric{
-			Name: proto.String("ValueName"),
+			Name:  proto.String("ValueName"),
 			Value: proto.Float64(13),
-			Unit: proto.String("giraffes"),
+			Unit:  proto.String("giraffes"),
 		}
-		
+
 		ew.Emit(event)
 		Expect(writer.Events).To(HaveLen(1))
 		Expect(writer.Events[0].GetOrigin()).To(Equal("Africa"))

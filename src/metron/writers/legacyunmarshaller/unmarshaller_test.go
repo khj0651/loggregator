@@ -4,7 +4,6 @@ import (
 	"metron/writers/legacyunmarshaller"
 	"metron/writers/mocks"
 
-	"github.com/cloudfoundry/loggregatorlib/cfcomponent/instrumentation/testhelpers"
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/logmessage"
 	"github.com/cloudfoundry/sonde-go/events"
@@ -55,21 +54,6 @@ var _ = Describe("LegacyUnmarshaller", func() {
 		It("does not put an envelope on the output channel if there is unmarshal error", func() {
 			unmarshaller.Write([]byte{1, 2, 3})
 			Expect(writer.Events).To(BeEmpty())
-		})
-	})
-
-	Context("metrics", func() {
-		BeforeEach(func() {
-			unmarshaller = legacyunmarshaller.New(&writer, loggertesthelper.Logger())
-		})
-
-		It("emits the correct metrics context", func() {
-			Expect(unmarshaller.Emit().Name).To(Equal("legacyUnmarshaller"))
-		})
-
-		It("emits an unmarshal error counter", func() {
-			unmarshaller.Write([]byte{1, 2, 3})
-			testhelpers.EventuallyExpectMetric(unmarshaller, "unmarshalErrors", 1)
 		})
 	})
 })
