@@ -52,7 +52,7 @@ func (nr *NetworkReader) Start() {
 		copy(readData, readBuffer[:readCount])
 
 		metrics.BatchIncrementCounter(nr.contextName + ".receivedMessageCount")
-		metrics.BatchAddCounter(nr.contextName + ".receivedByteCount", uint64(readCount))
+		metrics.BatchAddCounter(nr.contextName+".receivedByteCount", uint64(readCount))
 		nr.writer.Write(readData)
 	}
 }

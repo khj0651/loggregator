@@ -80,7 +80,97 @@ var _ = Describe("Self Instrumentation", func() {
 		}
 
 		Eventually(envelopes).Should(Receive(MatchSpecifiedContents(&expected)))
+	})
 
+	Describe("for Dropsonde unmarshaller", func() {
+		It("counts errors", func() {
+			metronInput, _ := net.Dial("udp", "localhost:51161")
+			metronInput.Write([]byte{1,2,3})
+
+			expected := events.Envelope{
+				Origin:    proto.String("MetronAgent"),
+				EventType: events.Envelope_CounterEvent.Enum(),
+				CounterEvent: &events.CounterEvent{
+					Name:  proto.String("dropsondeUnmarshaller.unmarshalErrors"),
+					Delta: proto.Uint64(1),
+					Total: proto.Uint64(1),
+				},
+			}
+
+			Eventually(envelopes).Should(Receive(MatchSpecifiedContents(&expected)))
+		})
+
+		It("counts unmarshalled Dropsonde messages by type", func() {
+			metronInput, _ := net.Dial("udp", "localhost:51161")
+			metronInput.Write(basicValueMessage())
+
+			expected := events.Envelope{
+				Origin:    proto.String("MetronAgent"),
+				EventType: events.Envelope_CounterEvent.Enum(),
+				CounterEvent: &events.CounterEvent{
+					Name:  proto.String("dropsondeUnmarshaller.valueMetricReceived"),
+					Delta: proto.Uint64(1),
+					Total: proto.Uint64(1),
+				},
+			}
+
+			Eventually(envelopes).Should(Receive(MatchSpecifiedContents(&expected)))
+		})
+
+		It("counts log messages specially", func() {
+			metronInput, _ := net.Dial("udp", "localhost:51161")
+
+			logEnvelope := &events.Envelope{
+				Origin: proto.String("fake-origin-2"),
+				EventType: events.Envelope_LogMessage.Enum(),
+				LogMessage: &events.LogMessage{
+					Message: []byte("hello"),
+					MessageType: events.LogMessage_OUT.Enum(),
+					Timestamp: proto.Int64(1234),
+				},
+			}
+			logBytes, _ := proto.Marshal(logEnvelope)
+
+			metronInput.Write(logBytes)
+
+			expected := events.Envelope{
+				Origin:    proto.String("MetronAgent"),
+				EventType: events.Envelope_CounterEvent.Enum(),
+				CounterEvent: &events.CounterEvent{
+					Name:  proto.String("dropsondeUnmarshaller.logMessageTotal"),
+					Delta: proto.Uint64(1),
+					Total: proto.Uint64(1),
+				},
+			}
+
+			Eventually(envelopes).Should(Receive(MatchSpecifiedContents(&expected)))
+		})
+
+		It("counts unknown event types", func() {
+			metronInput, _ := net.Dial("udp", "localhost:51161")
+			message := basicValueMessageEnvelope()
+			message.EventType = nil
+			bytes, _ := proto.Marshal(message)
+			metronInput.Write(bytes)
+
+			message = basicValueMessageEnvelope()
+			badEventType := events.Envelope_EventType(1000)
+			message.EventType = &badEventType
+			bytes, _ = proto.Marshal(message)
+			metronInput.Write(bytes)
+
+			expected := events.Envelope{
+				Origin:    proto.String("MetronAgent"),
+				EventType: events.Envelope_CounterEvent.Enum(),
+				CounterEvent: &events.CounterEvent{
+					Name:  proto.String("dropsondeUnmarshaller.unknownEventTypeReceived"),
+					Delta: proto.Uint64(2),
+					Total: proto.Uint64(2),
+				},
+			}
+
+			Eventually(envelopes).Should(Receive(MatchSpecifiedContents(&expected)))
+		})
 	})
 })
 

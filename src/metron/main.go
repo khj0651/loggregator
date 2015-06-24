@@ -62,7 +62,6 @@ func main() {
 	legacyReader := networkreader.New(fmt.Sprintf("localhost:%d", config.LegacyIncomingMessagesPort), "legacyAgentListener", legacyUnmarshaller, logger)
 
 	instrumentables := []instrumentation.Instrumentable{
-		dropsondeUnmarshaller,
 		aggregator,
 		marshaller,
 	}
