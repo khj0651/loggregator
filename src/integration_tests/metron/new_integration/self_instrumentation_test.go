@@ -7,15 +7,15 @@ import (
 	"github.com/cloudfoundry/storeadapter"
 	"github.com/gogo/protobuf/proto"
 
-
 	"github.com/cloudfoundry/dropsonde/dropsonde_unmarshaller"
 	"github.com/cloudfoundry/loggregatorlib/agentlistener"
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/sonde-go/events"
 
+	. "integration_tests/metron/matchers"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	. "integration_tests/metron/matchers"
 )
 
 var _ = Describe("Self Instrumentation", func() {
@@ -67,7 +67,7 @@ var _ = Describe("Self Instrumentation", func() {
 
 	It("counts legacy unmarshal errors", func() {
 		metronInput, _ := net.Dial("udp", "localhost:51160")
-		metronInput.Write([]byte{1,2,3})
+		metronInput.Write([]byte{1, 2, 3})
 
 		expected := events.Envelope{
 			Origin:    proto.String("MetronAgent"),
@@ -85,7 +85,7 @@ var _ = Describe("Self Instrumentation", func() {
 	Describe("for Dropsonde unmarshaller", func() {
 		It("counts errors", func() {
 			metronInput, _ := net.Dial("udp", "localhost:51161")
-			metronInput.Write([]byte{1,2,3})
+			metronInput.Write([]byte{1, 2, 3})
 
 			expected := events.Envelope{
 				Origin:    proto.String("MetronAgent"),
@@ -121,12 +121,12 @@ var _ = Describe("Self Instrumentation", func() {
 			metronInput, _ := net.Dial("udp", "localhost:51161")
 
 			logEnvelope := &events.Envelope{
-				Origin: proto.String("fake-origin-2"),
+				Origin:    proto.String("fake-origin-2"),
 				EventType: events.Envelope_LogMessage.Enum(),
 				LogMessage: &events.LogMessage{
-					Message: []byte("hello"),
+					Message:     []byte("hello"),
 					MessageType: events.LogMessage_OUT.Enum(),
-					Timestamp: proto.Int64(1234),
+					Timestamp:   proto.Int64(1234),
 				},
 			}
 			logBytes, _ := proto.Marshal(logEnvelope)
@@ -149,14 +149,18 @@ var _ = Describe("Self Instrumentation", func() {
 		It("counts unknown event types", func() {
 			metronInput, _ := net.Dial("udp", "localhost:51161")
 			message := basicValueMessageEnvelope()
-			message.EventType = nil
-			bytes, _ := proto.Marshal(message)
+			message.EventType = events.Envelope_EventType(2000).Enum()
+			bytes, err := proto.Marshal(message)
+			Expect(err).ToNot(HaveOccurred())
+
 			metronInput.Write(bytes)
 
 			message = basicValueMessageEnvelope()
 			badEventType := events.Envelope_EventType(1000)
 			message.EventType = &badEventType
-			bytes, _ = proto.Marshal(message)
+			bytes, err = proto.Marshal(message)
+			Expect(err).ToNot(HaveOccurred())
+
 			metronInput.Write(bytes)
 
 			expected := events.Envelope{
