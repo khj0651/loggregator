@@ -2,10 +2,11 @@ package matchers
 
 import (
 	"fmt"
-	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/onsi/gomega/types"
-	"github.com/onsi/gomega/format"
 	"reflect"
+
+	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/onsi/gomega/format"
+	"github.com/onsi/gomega/types"
 )
 
 func MatchSpecifiedContents(expected interface{}) types.GomegaMatcher {
@@ -15,7 +16,7 @@ func MatchSpecifiedContents(expected interface{}) types.GomegaMatcher {
 }
 
 type specifiedContentsMatcher struct {
-	expected interface{}
+	expected      interface{}
 	failureReason string
 }
 

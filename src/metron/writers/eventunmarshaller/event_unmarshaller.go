@@ -59,10 +59,6 @@ func (u *EventUnmarshaller) UnmarshallMessage(message []byte) (*events.Envelope,
 	return envelope, nil
 }
 
-func (u *EventUnmarshaller) incrementLogMessageReceiveCount(appID string) {
-
-}
-
 func (u *EventUnmarshaller) incrementReceiveCount(eventType events.Envelope_EventType) {
 	switch eventType {
 	case events.Envelope_LogMessage:

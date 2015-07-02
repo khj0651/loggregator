@@ -48,6 +48,24 @@ var _ = Describe("EventUnmarshaller", func() {
 			Expect(output).To(BeNil())
 			Expect(err).To(HaveOccurred())
 		})
+
+		It("doesn't write unknown event types", func() {
+			unknownEventTypeMessage := &events.Envelope{
+				Origin:    proto.String("fake-origin-2"),
+				EventType: events.Envelope_EventType(2000).Enum(),
+				ValueMetric: &events.ValueMetric{
+					Name:  proto.String("fake-metric-name"),
+					Value: proto.Float64(42),
+					Unit:  proto.String("fake-unit"),
+				},
+			}
+			message, err := proto.Marshal(unknownEventTypeMessage)
+			Expect(err).ToNot(HaveOccurred())
+
+			output, err := unmarshaller.UnmarshallMessage(message)
+			Expect(output).To(BeNil())
+			Expect(err).To(HaveOccurred())
+		})
 	})
 
 	Context("Write", func() {

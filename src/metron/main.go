@@ -45,14 +45,11 @@ func main() {
 
 	dopplerForwarder := dopplerforwarder.New(dopplerClientPool, logger)
 	byteSigner := signer.New(config.SharedSecret, dopplerForwarder)
-	marshaller := eventmarshaller.New(byteSigner, logger)
+	marshaller := eventmarshaller.New(byteSigner, logger, true)
 	messageTagger := tagger.New(config.Deployment, config.Job, config.Index, marshaller)
-	aggregator := messageaggregator.New(messageTagger, logger)
+	aggregator := messageaggregator.New(messageTagger, logger, true)
 
-	eventWriter := eventwriter.New("MetronAgent", aggregator)
-	metricSender := metric_sender.NewMetricSender(eventWriter)
-	metricBatcher := metricbatcher.New(metricSender, time.Duration(config.MetricBatchIntervalSeconds)*time.Second)
-	metrics.Initialize(metricSender, metricBatcher)
+	initializeMetrics(byteSigner, config, logger)
 
 	dropsondeUnmarshaller := eventunmarshaller.New(aggregator, logger)
 	dropsondeReader := networkreader.New(fmt.Sprintf("localhost:%d", config.DropsondeIncomingMessagesPort), "dropsondeAgentListener", dropsondeUnmarshaller, logger)
@@ -96,6 +93,17 @@ func initializeClientPool(config metronConfig, logger *gosteno.Logger) *clientpo
 
 	clientPool := clientpool.NewLoggregatorClientPool(logger, config.LoggregatorDropsondePort, inZoneServerAddressList, allZoneServerAddressList)
 	return clientPool
+}
+
+func initializeMetrics(byteSigner *signer.Signer, config metronConfig, logger *gosteno.Logger) {
+	metricsMarshaller := eventmarshaller.New(byteSigner, logger, false)
+	metricsTagger := tagger.New(config.Deployment, config.Job, config.Index, metricsMarshaller)
+	metricsAggregator := messageaggregator.New(metricsTagger, logger, false)
+
+	eventWriter := eventwriter.New("MetronAgent", metricsAggregator)
+	metricSender := metric_sender.NewMetricSender(eventWriter)
+	metricBatcher := metricbatcher.New(metricSender, time.Duration(config.MetricBatchIntervalSeconds)*time.Second)
+	metrics.Initialize(metricSender, metricBatcher)
 }
 
 func storeAdapterProvider(urls []string, concurrentRequests int) storeadapter.StoreAdapter {
