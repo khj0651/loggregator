@@ -49,6 +49,8 @@ func IpOutsideOfRanges(testURL url.URL, ranges []IPRange) (bool, error) {
 			return false, errors.New(fmt.Sprintf("Resolving host failed: %s", err))
 		}
 		ipAddress = net.ParseIP(ipAddr.String())
+		fmt.Print("2 ipAddress= ")
+		fmt.Println(ipAddress)
 	}
 	if host == "doesNotExist.local" {
 		fmt.Print("2 ipAddress= ")
