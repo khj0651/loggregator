@@ -39,21 +39,15 @@ func IpOutsideOfRanges(testURL url.URL, ranges []IPRange) (bool, error) {
 
 	host := strings.Split(testURL.Host, ":")[0]
 	ipAddress := net.ParseIP(host)
-	if host == "doesNotExist.local" {
-		fmt.Print("1 ipAddress= ")
-		fmt.Println(ipAddress)
-	}
 	if ipAddress == nil {
 		ipAddr, err := net.ResolveIPAddr("ip", host)
 		if err != nil {
 			return false, errors.New(fmt.Sprintf("Resolving host failed: %s", err))
 		}
 		ipAddress = net.ParseIP(ipAddr.String())
-		fmt.Print("2 ipAddress= ")
-		fmt.Println(ipAddress)
 	}
 	if host == "doesNotExist.local" {
-		fmt.Print("2 ipAddress= ")
+		fmt.Print("doesNotExist.local ipAddress= ")
 		fmt.Println(ipAddress)
 	}
 
