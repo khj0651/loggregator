@@ -105,6 +105,8 @@ var _ = Describe("IPRange", func() {
 
 			parsedURL, _ = url.Parse("syslog://doesNotExist.local:3000?app=great")
 			outSideOfRange, err = iprange.IpOutsideOfRanges(*parsedURL, ranges)
+			fmt.Print("error:")
+			fmt.Println(err)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("Resolving host failed: "))
 		})
